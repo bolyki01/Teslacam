@@ -48,3 +48,8 @@ node_modules/
 .gradle/
 Pods/
 .swiftpm/
+
+# Python CLI artifacts
+__pycache__/
+*.pyc
+.pytest_cache/

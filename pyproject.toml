@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teslacam-cli"
+version = "0.1.0"
+description = "Cross-platform interactive CLI for composing TeslaCam multi-camera footage"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "See repository license and bundled third-party licenses."}
+authors = [
+  {name = "Teslacam contributors"}
+]
+dependencies = []
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Environment :: Console",
+  "Topic :: Multimedia :: Video",
+]
+
+[project.scripts]
+teslacam-cli = "teslacam_cli.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["teslacam_cli*"]

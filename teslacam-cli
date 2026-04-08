@@ -7,8 +7,5 @@ fi
 if command -v python >/dev/null 2>&1; then
   exec python "$SCRIPT_DIR/teslacam.py" "$@"
 fi
-if command -v zsh >/dev/null 2>&1; then
-  exec zsh "$SCRIPT_DIR/teslacam_legacy_macos.sh" "$@"
-fi
 printf '%s\n' "Python 3 is required." >&2
 exit 1
