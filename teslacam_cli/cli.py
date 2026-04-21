@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from .composer import (
     clip_set_duration,
@@ -18,8 +18,8 @@ from .composer import (
 )
 from .ffmpeg_tools import ToolResolutionError, choose_encoder, resolve_tools
 from .layouts import PROFILE_LABELS, build_layout, detect_layout_kind, fill_missing_dimensions
-from .models import Camera, ComposePlan
-from .scanner import cameras_in_sets, format_clip_timestamp, parse_clip_timestamp, scan_clips
+from .models import Camera, ComposePlan, DuplicatePolicy, OutputConflictPolicy
+from .scanner import cameras_in_sets, format_clip_timestamp, parse_clip_timestamp, scan_source
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,8 @@ class RunConfig:
     keep_workdir: bool
     x265_preset: str
     loglevel: str
+    duplicate_policy: DuplicatePolicy
+    output_conflict: OutputConflictPolicy
 
 
 
@@ -45,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Cross-platform TeslaCam CLI composer. Default output: H.265/HEVC MP4 in lossless mode.",
     )
     parser.add_argument("source", nargs="?", help="TeslaCam source folder")
-    parser.add_argument("-o", "--output", help="Output MP4 path")
+    parser.add_argument("-o", "--output", help="Output MP4 path or output directory")
     parser.add_argument("--start", help="Start time. Accepts DD/MM/YYYY-HH:MM:SS, YYYY-MM-DD HH:MM:SS, YYYY-MM-DD_HH-MM-SS")
     parser.add_argument("--end", help="End time. Accepts DD/MM/YYYY-HH:MM:SS, YYYY-MM-DD HH:MM:SS, YYYY-MM-DD_HH-MM-SS")
     parser.add_argument(
@@ -59,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["lossless", "quality"],
         default="lossless",
         help="lossless = x265 lossless HEVC MP4. quality = x265 CRF 6 HEVC MP4.",
+    )
+    parser.add_argument(
+        "--duplicate-policy",
+        choices=[policy.value for policy in DuplicatePolicy],
+        default=DuplicatePolicy.MERGE_BY_TIME.value,
+        help="How to handle duplicate clips that share the same timestamp and camera.",
+    )
+    parser.add_argument(
+        "--output-conflict",
+        choices=[policy.value for policy in OutputConflictPolicy],
+        default=OutputConflictPolicy.UNIQUE.value,
+        help="How to handle an output file that already exists.",
     )
     parser.add_argument("--x265-preset", default="medium", help="x265 preset for encode speed/compression ratio")
     parser.add_argument("--ffmpeg", help="Path to ffmpeg")
@@ -80,16 +94,30 @@ def main(argv: Optional[list[str]] = None) -> int:
         repo_root = Path(__file__).resolve().parent.parent
         interactive = args.interactive or args.source is None
         ffmpeg, ffprobe = resolve_tools(repo_root, args.ffmpeg, args.ffprobe)
+        duplicate_policy = DuplicatePolicy(args.duplicate_policy)
+        output_conflict = OutputConflictPolicy(args.output_conflict)
 
         if interactive:
-            config = prompt_run_config(ffmpeg=ffmpeg, ffprobe=ffprobe)
+            config = prompt_run_config(
+                ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
+                duplicate_policy=duplicate_policy,
+                output_conflict=output_conflict,
+            )
         else:
             source_dir = Path(args.source).expanduser().resolve()
-            clip_sets = scan_clips(source_dir)
-            start_default, end_default = dataset_range(clip_sets, ffprobe)
+            scan_result = scan_source(source_dir, duplicate_policy=duplicate_policy)
+            start_default, end_default = dataset_range(scan_result.clip_sets, ffprobe)
             start_time = parse_user_datetime(args.start) if args.start else start_default
             end_time = parse_user_datetime(args.end) if args.end else end_default
-            output_file = resolve_output_path(source_dir, args.output, args.mode, start_time, end_time)
+            output_file = resolve_output_path(
+                source_dir,
+                args.output,
+                args.mode,
+                start_time,
+                end_time,
+                output_conflict=output_conflict,
+            )
             workdir, workdir_was_explicit = prepare_workdir(Path(args.workdir).expanduser().resolve() if args.workdir else None)
             config = RunConfig(
                 source_dir=source_dir,
@@ -104,13 +132,15 @@ def main(argv: Optional[list[str]] = None) -> int:
                 keep_workdir=args.keep_workdir or workdir_was_explicit,
                 x265_preset=args.x265_preset,
                 loglevel=args.loglevel,
+                duplicate_policy=duplicate_policy,
+                output_conflict=output_conflict,
             )
 
         if config.end_time <= config.start_time:
             raise RuntimeError("End time must be after start time.")
 
-        clip_sets = scan_clips(config.source_dir)
-        selected_sets = select_clip_sets(clip_sets, config.start_time, config.end_time, config.ffprobe)
+        scan_result = scan_source(config.source_dir, duplicate_policy=config.duplicate_policy)
+        selected_sets = select_clip_sets(scan_result.clip_sets, config.start_time, config.end_time, config.ffprobe)
         if not selected_sets:
             raise RuntimeError("No clips overlap the requested time range.")
 
@@ -131,6 +161,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             mode=encoder.label,
             camera_dimensions=dimensions,
             sets=len(selected_sets),
+            duplicate_policy=config.duplicate_policy,
+            duplicate_file_count=scan_result.duplicate_file_count,
+            duplicate_timestamp_count=scan_result.duplicate_timestamp_count,
         )
 
         if args.dry_run:
@@ -211,19 +244,59 @@ def default_output_filename(mode: str, start_time: datetime, end_time: datetime)
 
 
 
-def resolve_output_path(source_dir: Path, output_arg: Optional[str], mode: str, start_time: datetime, end_time: datetime) -> Path:
+def resolve_output_path(
+    source_dir: Path,
+    output_arg: Optional[str],
+    mode: str,
+    start_time: datetime,
+    end_time: datetime,
+    output_conflict: OutputConflictPolicy = OutputConflictPolicy.UNIQUE,
+) -> Path:
     if output_arg:
-        path = Path(output_arg).expanduser().resolve()
+        raw_path = Path(output_arg).expanduser().resolve()
+        if raw_path.exists() and raw_path.is_dir():
+            path = raw_path / default_output_filename(mode, start_time, end_time)
+        else:
+            path = raw_path
         if path.suffix.lower() != ".mp4":
             path = path.with_suffix(".mp4")
-        return path
+        return apply_output_conflict_policy(path, output_conflict)
     output_dir = source_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    return (output_dir / default_output_filename(mode, start_time, end_time)).resolve()
+    path = (output_dir / default_output_filename(mode, start_time, end_time)).resolve()
+    return apply_output_conflict_policy(path, output_conflict)
 
 
 
-def prompt_run_config(ffmpeg: Path, ffprobe: Path) -> RunConfig:
+def apply_output_conflict_policy(path: Path, policy: OutputConflictPolicy) -> Path:
+    if not path.exists() or policy == OutputConflictPolicy.OVERWRITE:
+        return path
+    if policy == OutputConflictPolicy.ERROR:
+        raise RuntimeError(f"Output file already exists: {path}")
+    return unique_output_path(path)
+
+
+
+def unique_output_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    parent = path.parent
+    stem = path.stem
+    suffix = path.suffix
+    for counter in range(2, 10_000):
+        candidate = parent / f"{stem}-{counter}{suffix}"
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"Could not find an available output filename next to: {path}")
+
+
+
+def prompt_run_config(
+    ffmpeg: Path,
+    ffprobe: Path,
+    duplicate_policy: DuplicatePolicy,
+    output_conflict: OutputConflictPolicy,
+) -> RunConfig:
     while True:
         raw_source = input("TeslaCam source folder: ").strip()
         if raw_source:
@@ -232,7 +305,8 @@ def prompt_run_config(ffmpeg: Path, ffprobe: Path) -> RunConfig:
                 break
         print("Invalid folder.")
 
-    clip_sets = scan_clips(source_dir)
+    scan_result = scan_source(source_dir, duplicate_policy=duplicate_policy)
+    clip_sets = scan_result.clip_sets
     start_default, end_default = dataset_range(clip_sets, ffprobe)
     cameras = cameras_in_sets(clip_sets)
     print(
@@ -240,6 +314,13 @@ def prompt_run_config(ffmpeg: Path, ffprobe: Path) -> RunConfig:
         f"Range: {start_default} -> {end_default} | "
         f"Cameras: {', '.join(camera.display_name for camera in sorted(cameras, key=lambda item: item.value))}"
     )
+    if scan_result.has_conflicts:
+        print(
+            "Duplicates: "
+            f"{scan_result.duplicate_file_count} file(s), "
+            f"{scan_result.duplicate_timestamp_count} timestamp collision(s) | "
+            f"Policy: {duplicate_policy.display_name}"
+        )
 
     print("Car/layout profile:")
     print("  1) auto    - Auto-detect from clips")
@@ -263,9 +344,23 @@ def prompt_run_config(ffmpeg: Path, ffprobe: Path) -> RunConfig:
     mode = prompt_choice("Mode [lossless]: ", default="lossless", allowed={"lossless", "quality", "1", "2"})
     mode = {"1": "lossless", "2": "quality"}.get(mode, mode)
 
-    default_output = resolve_output_path(source_dir, None, mode, start_time, end_time)
+    default_output = resolve_output_path(
+        source_dir,
+        None,
+        mode,
+        start_time,
+        end_time,
+        output_conflict=output_conflict,
+    )
     raw_output = input(f"Output MP4 [{default_output}]: ").strip()
-    output_file = Path(raw_output).expanduser().resolve() if raw_output else default_output
+    output_file = resolve_output_path(
+        source_dir,
+        raw_output if raw_output else str(default_output),
+        mode,
+        start_time,
+        end_time,
+        output_conflict=output_conflict,
+    )
 
     raw_workdir = input("Workdir [temporary]: ").strip()
     workdir, workdir_was_explicit = prepare_workdir(Path(raw_workdir).expanduser().resolve() if raw_workdir else None)
@@ -288,6 +383,8 @@ def prompt_run_config(ffmpeg: Path, ffprobe: Path) -> RunConfig:
         keep_workdir=keep_workdir,
         x265_preset=raw_preset,
         loglevel="info",
+        duplicate_policy=duplicate_policy,
+        output_conflict=output_conflict,
     )
 
 
@@ -324,6 +421,9 @@ def print_summary(
     mode: str,
     camera_dimensions: dict[Camera, object],
     sets: int,
+    duplicate_policy: DuplicatePolicy,
+    duplicate_file_count: int,
+    duplicate_timestamp_count: int,
 ) -> None:
     dimension_text = ", ".join(
         f"{camera.value}={dims.width}x{dims.height}"
@@ -336,6 +436,7 @@ def print_summary(
     print(f"  Layout: {layout} | Sets: {sets}")
     print(f"  Mode:   {mode}")
     print(f"  Cells:  {dimension_text}")
+    print(f"  Dups:   {duplicate_policy.display_name} | Files: {duplicate_file_count} | Timestamps: {duplicate_timestamp_count}")
 
 
 if __name__ == "__main__":  # pragma: no cover

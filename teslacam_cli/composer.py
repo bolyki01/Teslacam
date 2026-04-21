@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import Dict, Iterable, List, Optional
 
-from .ffmpeg_tools import ffconcat_path, probe_dimensions, probe_duration, probe_fps, run_command
+from .ffmpeg_tools import ffconcat_path, probe_dimensions, probe_duration, probe_fps, probe_has_video_stream, run_command
 from .models import Camera, ClipSet, ComposePlan, Dimensions, LayoutSpec, MIXED_CAMERA_ORDER, SelectedSet
 
 
@@ -58,11 +58,14 @@ def select_clip_sets(
 
 
 
-def first_existing_clip(clip_set: ClipSet) -> Optional[Path]:
+def first_existing_clip(clip_set: ClipSet, ffprobe: Optional[Path] = None) -> Optional[Path]:
     for camera in MIXED_CAMERA_ORDER:
         candidate = clip_set.files.get(camera)
-        if candidate and candidate.exists():
-            return candidate
+        if not candidate or not candidate.exists():
+            continue
+        if ffprobe is not None and not probe_has_video_stream(ffprobe, candidate):
+            continue
+        return candidate
     return None
 
 
@@ -85,7 +88,7 @@ def probe_dimensions_for_selection(
 
 def probe_selection_fps(ffprobe: Path, selected_sets: Iterable[SelectedSet]) -> float:
     for selected in selected_sets:
-        source = first_existing_clip(selected.clip_set)
+        source = first_existing_clip(selected.clip_set, ffprobe=ffprobe)
         if source is not None:
             return probe_fps(ffprobe, source)
     return 36.027
@@ -106,6 +109,8 @@ def compose(plan: ComposePlan) -> Path:
     parts_dir.mkdir(parents=True, exist_ok=True)
     concat_file = plan.workdir / "concat.txt"
     part_paths: List[Path] = []
+    clip_readability = collect_clip_readability(plan.ffprobe, plan.selected_sets)
+    unreadable_paths = sorted(path for path, readable in clip_readability.items() if not readable)
 
     print(f"Using ffmpeg: {plan.ffmpeg}")
     print(f"Using ffprobe: {plan.ffprobe}")
@@ -114,6 +119,12 @@ def compose(plan: ComposePlan) -> Path:
         f"Layout: {plan.layout.kind.value} | FPS: {plan.fps:.3f} | Mode: {plan.encoder.label}"
     )
     print(f"Clip sets selected: {len(plan.selected_sets)}")
+    if unreadable_paths:
+        print(f"Warning: {len(unreadable_paths)} unreadable or missing clip(s) will render as black placeholders.")
+        for clip_path in unreadable_paths[:5]:
+            print(f"  - {clip_path}")
+        if len(unreadable_paths) > 5:
+            print(f"  ... {len(unreadable_paths) - 5} more")
 
     for index, selected in enumerate(plan.selected_sets, start=1):
         part_path = parts_dir / f"{index:06d}_{selected.clip_set.timestamp}.{plan.encoder.output_extension}"
@@ -121,7 +132,7 @@ def compose(plan: ComposePlan) -> Path:
             f"[{index}/{len(plan.selected_sets)}] {selected.clip_set.timestamp} "
             f"trim {selected.trim_start:.3f}s -> {selected.trim_end:.3f}s"
         )
-        command = build_part_command(plan, selected, part_path)
+        command = build_part_command(plan, selected, part_path, clip_readability)
         run_command(command)
         part_paths.append(part_path)
 
@@ -154,7 +165,12 @@ def compose(plan: ComposePlan) -> Path:
 
 
 
-def build_part_command(plan: ComposePlan, selected: SelectedSet, part_path: Path) -> List[str]:
+def build_part_command(
+    plan: ComposePlan,
+    selected: SelectedSet,
+    part_path: Path,
+    clip_readability: Optional[Dict[Path, bool]] = None,
+) -> List[str]:
     input_args: List[str] = []
     filter_parts: List[str] = []
     labels: List[str] = []
@@ -165,7 +181,12 @@ def build_part_command(plan: ComposePlan, selected: SelectedSet, part_path: Path
     for input_index, camera in enumerate(plan.layout.cameras):
         clip_path = selected.clip_set.files.get(camera)
         cell = plan.layout.cell_by_camera[camera]
-        if clip_path is not None and clip_path.exists():
+        clip_is_usable = bool(
+            clip_path
+            and clip_path.exists()
+            and (clip_readability.get(clip_path, True) if clip_readability is not None else True)
+        )
+        if clip_is_usable and clip_path is not None:
             input_args.extend(["-i", str(clip_path)])
         else:
             input_args.extend(
@@ -217,6 +238,16 @@ def build_part_command(plan: ComposePlan, selected: SelectedSet, part_path: Path
         *plan.encoder.args,
         str(part_path),
     ]
+
+
+def collect_clip_readability(ffprobe: Path, selected_sets: Iterable[SelectedSet]) -> Dict[Path, bool]:
+    readability: Dict[Path, bool] = {}
+    for selected in selected_sets:
+        for clip_path in selected.clip_set.files.values():
+            if clip_path in readability:
+                continue
+            readability[clip_path] = clip_path.exists() and probe_has_video_stream(ffprobe, clip_path)
+    return readability
 
 
 

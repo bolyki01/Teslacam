@@ -318,6 +318,229 @@ final class DebugLogSink: ObservableObject {
   }
 }
 
+struct TimelinePlaybackSegment: Equatable {
+  let clipIndex: Int?
+  let startSeconds: Double
+  let duration: Double
+
+  func matchesLoadedSegment(
+    clipIndex: Int?,
+    startSeconds: Double,
+    duration: Double,
+    tolerance: Double = 0.001
+  ) -> Bool {
+    self.clipIndex == clipIndex
+      && abs(self.startSeconds - startSeconds) <= tolerance
+      && abs(self.duration - duration) <= tolerance
+  }
+}
+
+struct TimelineCoverageMap {
+  let anchorDate: Date?
+  let totalDuration: Double
+
+  private let sortedOriginalIndices: [Int]
+  private let originalToSortedIndices: [Int]
+  private let startOffsets: [Double]
+  private let endOffsets: [Double]
+  private let prefixMaxEndOffsets: [Double]
+  private let sortedEndOffsets: [Double]
+
+  init(sets: [ClipSet]) {
+    guard !sets.isEmpty else {
+      anchorDate = nil
+      totalDuration = 0
+      sortedOriginalIndices = []
+      originalToSortedIndices = []
+      startOffsets = []
+      endOffsets = []
+      prefixMaxEndOffsets = []
+      sortedEndOffsets = []
+      return
+    }
+
+    let ordered = sets.enumerated().sorted { lhs, rhs in
+      if lhs.element.date == rhs.element.date {
+        if lhs.element.timestamp == rhs.element.timestamp {
+          return lhs.element.id < rhs.element.id
+        }
+        return lhs.element.timestamp < rhs.element.timestamp
+      }
+      return lhs.element.date < rhs.element.date
+    }
+
+    let anchor = ordered[0].element.date
+    anchorDate = anchor
+
+    var sortedOriginalIndices: [Int] = []
+    var originalToSortedIndices = Array(repeating: -1, count: sets.count)
+    var startOffsets: [Double] = []
+    var endOffsets: [Double] = []
+    var sortedEndOffsets: [Double] = []
+    sortedOriginalIndices.reserveCapacity(ordered.count)
+    startOffsets.reserveCapacity(ordered.count)
+    endOffsets.reserveCapacity(ordered.count)
+    sortedEndOffsets.reserveCapacity(ordered.count)
+
+    for (sortedIndex, item) in ordered.enumerated() {
+      let originalIndex = item.offset
+      let set = item.element
+      let start = max(0, set.date.timeIntervalSince(anchor))
+      let end = start + max(1.0 / 30.0, set.duration)
+
+      sortedOriginalIndices.append(originalIndex)
+      originalToSortedIndices[originalIndex] = sortedIndex
+      startOffsets.append(start)
+      endOffsets.append(end)
+      sortedEndOffsets.append(end)
+    }
+
+    var prefixMaxEndOffsets: [Double] = []
+    prefixMaxEndOffsets.reserveCapacity(endOffsets.count)
+    var coveredEnd = 0.0
+    for endOffset in endOffsets {
+      coveredEnd = max(coveredEnd, endOffset)
+      prefixMaxEndOffsets.append(coveredEnd)
+    }
+
+    self.sortedOriginalIndices = sortedOriginalIndices
+    self.originalToSortedIndices = originalToSortedIndices
+    self.startOffsets = startOffsets
+    self.endOffsets = endOffsets
+    self.prefixMaxEndOffsets = prefixMaxEndOffsets
+    self.sortedEndOffsets = sortedEndOffsets.sorted()
+    self.totalDuration = max(1.0 / 30.0, endOffsets.max() ?? 0)
+  }
+
+  func date(forGlobalSeconds seconds: Double) -> Date? {
+    guard let anchorDate else { return nil }
+    let clamped = max(0, min(seconds, totalDuration))
+    return anchorDate.addingTimeInterval(clamped)
+  }
+
+  func globalSeconds(for date: Date) -> Double {
+    guard let anchorDate else { return 0 }
+    let seconds = date.timeIntervalSince(anchorDate)
+    return max(0, min(seconds, totalDuration))
+  }
+
+  func clipStartOffset(at index: Int) -> Double {
+    guard index >= 0, index < originalToSortedIndices.count else { return 0 }
+    let sortedIndex = originalToSortedIndices[index]
+    guard sortedIndex >= 0 else { return 0 }
+    return startOffsets[sortedIndex]
+  }
+
+  func activeClipIndex(at globalSeconds: Double, tolerance: Double = 0.001) -> Int? {
+    guard !startOffsets.isEmpty else { return nil }
+    let clamped = max(0, min(globalSeconds, totalDuration))
+    var candidate = upperBound(in: startOffsets, for: clamped) - 1
+
+    while candidate >= 0 {
+      if prefixMaxEndOffsets[candidate] + tolerance < clamped {
+        break
+      }
+      if endOffsets[candidate] + tolerance >= clamped {
+        return sortedOriginalIndices[candidate]
+      }
+      candidate -= 1
+    }
+
+    return nil
+  }
+
+  func nearestClipIndex(to globalSeconds: Double) -> Int {
+    if let active = activeClipIndex(at: globalSeconds) {
+      return active
+    }
+    guard !startOffsets.isEmpty else { return 0 }
+    let candidate = max(0, upperBound(in: startOffsets, for: globalSeconds) - 1)
+    return sortedOriginalIndices[candidate]
+  }
+
+  func playbackSegment(
+    at globalSeconds: Double,
+    tolerance: Double = 0.001,
+    minimumDuration: Double = 1.0 / 30.0
+  ) -> TimelinePlaybackSegment {
+    guard !startOffsets.isEmpty else {
+      return TimelinePlaybackSegment(
+        clipIndex: nil,
+        startSeconds: 0,
+        duration: max(minimumDuration, totalDuration)
+      )
+    }
+
+    let clamped = max(0, min(globalSeconds, totalDuration))
+    if let clipIndex = activeClipIndex(at: clamped, tolerance: tolerance) {
+      let sortedIndex = originalToSortedIndices[clipIndex]
+      let start = startOffsets[sortedIndex]
+      let end = endOffsets[sortedIndex]
+      return TimelinePlaybackSegment(
+        clipIndex: clipIndex,
+        startSeconds: start,
+        duration: max(minimumDuration, end - start)
+      )
+    }
+
+    let insertion = upperBound(in: startOffsets, for: clamped)
+    let previousCoveredEnd = insertion > 0 ? prefixMaxEndOffsets[insertion - 1] : 0
+    let nextStart = insertion < startOffsets.count ? startOffsets[insertion] : totalDuration
+    let startSeconds = min(max(previousCoveredEnd, 0), totalDuration)
+    let endSeconds = max(startSeconds + minimumDuration, min(nextStart, totalDuration))
+    return TimelinePlaybackSegment(
+      clipIndex: nil,
+      startSeconds: startSeconds,
+      duration: endSeconds - startSeconds
+    )
+  }
+
+  func completedClipCount(at globalSeconds: Double) -> Int {
+    guard !sortedEndOffsets.isEmpty else { return 0 }
+    let clamped = max(0, min(globalSeconds, totalDuration))
+    return upperBound(in: sortedEndOffsets, for: clamped)
+  }
+
+  func gapRanges(minimumDuration: Double = 1) -> [TimelineGapRange] {
+    guard !startOffsets.isEmpty else { return [] }
+
+    var gaps: [TimelineGapRange] = []
+    var coveredEnd = endOffsets[0]
+
+    for index in 1..<startOffsets.count {
+      let nextStart = startOffsets[index]
+      let uncovered = nextStart - coveredEnd
+      if uncovered > minimumDuration {
+        gaps.append(
+          TimelineGapRange(
+            startSeconds: max(0, coveredEnd),
+            endSeconds: max(0, nextStart)
+          )
+        )
+      }
+      coveredEnd = max(coveredEnd, endOffsets[index])
+    }
+
+    return gaps
+  }
+
+  private func upperBound(in values: [Double], for target: Double) -> Int {
+    var low = 0
+    var high = values.count
+
+    while low < high {
+      let mid = (low + high) / 2
+      if values[mid] <= target {
+        low = mid + 1
+      } else {
+        high = mid
+      }
+    }
+
+    return low
+  }
+}
+
 struct TimelineGapRange: Equatable, Hashable {
   let startSeconds: Double
   let endSeconds: Double
@@ -331,34 +554,7 @@ struct TimelineGapRange: Equatable, Hashable {
   }
 
   static func ranges(for sets: [ClipSet], minimumDuration: Double = 1) -> [TimelineGapRange] {
-    let ordered = sets.sorted { lhs, rhs in
-      if lhs.date == rhs.date {
-        return lhs.id < rhs.id
-      }
-      return lhs.date < rhs.date
-    }
-    guard let anchor = ordered.first?.date else { return [] }
-
-    var gaps: [TimelineGapRange] = []
-    var coveredEnd = ordered[0].endDate
-
-    for set in ordered.dropFirst() {
-      let nextStart = set.date
-      let uncovered = nextStart.timeIntervalSince(coveredEnd)
-      if uncovered > minimumDuration {
-        gaps.append(
-          TimelineGapRange(
-            startSeconds: max(0, coveredEnd.timeIntervalSince(anchor)),
-            endSeconds: max(0, nextStart.timeIntervalSince(anchor))
-          )
-        )
-      }
-      if set.endDate > coveredEnd {
-        coveredEnd = set.endDate
-      }
-    }
-
-    return gaps
+    TimelineCoverageMap(sets: sets).gapRanges(minimumDuration: minimumDuration)
   }
 }
 

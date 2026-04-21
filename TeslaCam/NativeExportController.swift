@@ -466,6 +466,8 @@ private struct TimelineFrameProvider {
   let trimEndDate: Date
   let totalDuration: Double
 
+  private let coverage: TimelineCoverageMap
+
   init(sets: [ClipSet], trimStartDate: Date, trimEndDate: Date) {
     self.sets = sets.sorted { lhs, rhs in
       if lhs.date == rhs.date {
@@ -476,6 +478,7 @@ private struct TimelineFrameProvider {
     self.trimStartDate = trimStartDate
     self.trimEndDate = max(trimEndDate, trimStartDate.addingTimeInterval(1.0 / 30.0))
     self.totalDuration = max(1.0 / 30.0, self.trimEndDate.timeIntervalSince(trimStartDate))
+    self.coverage = TimelineCoverageMap(sets: self.sets)
   }
 
   func context(for renderSeconds: Double) -> TimelineFrameContext {
@@ -485,16 +488,9 @@ private struct TimelineFrameProvider {
 
     let clamped = max(0, min(renderSeconds, totalDuration))
     let renderDate = trimStartDate.addingTimeInterval(clamped)
+    let coverageSeconds = coverage.globalSeconds(for: renderDate)
 
-    var activeIndex: Int?
-    for index in sets.indices {
-      let set = sets[index]
-      if renderDate >= set.date && renderDate < set.endDate {
-        activeIndex = index
-      }
-    }
-
-    if let activeIndex {
+    if let activeIndex = coverage.activeClipIndex(at: coverageSeconds) {
       let set = sets[activeIndex]
       return TimelineFrameContext(
         clipIndex: activeIndex,
@@ -509,7 +505,8 @@ private struct TimelineFrameProvider {
   func completedSetCount(at renderSeconds: Double) -> Int {
     let clamped = max(0, min(renderSeconds, totalDuration))
     let renderDate = trimStartDate.addingTimeInterval(clamped)
-    return sets.filter { $0.endDate <= renderDate }.count
+    let coverageSeconds = coverage.globalSeconds(for: renderDate)
+    return coverage.completedClipCount(at: coverageSeconds)
   }
 }
 

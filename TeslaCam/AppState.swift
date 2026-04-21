@@ -3,23 +3,6 @@ import Combine
 import AppKit
 import UniformTypeIdentifiers
 
-struct TimelinePlaybackSegment: Equatable {
-  let clipIndex: Int?
-  let startSeconds: Double
-  let duration: Double
-
-  func matchesLoadedSegment(
-    clipIndex: Int?,
-    startSeconds: Double,
-    duration: Double,
-    tolerance: Double = 0.001
-  ) -> Bool {
-    self.clipIndex == clipIndex
-      && abs(self.startSeconds - startSeconds) <= tolerance
-      && abs(self.duration - duration) <= tolerance
-  }
-}
-
 final class AppState: ObservableObject {
   private enum StorageKey {
     static let lastSourceBookmarks = "TeslaCam.lastSourceBookmarks"
@@ -71,9 +54,8 @@ final class AppState: ObservableObject {
   let playback = MultiCamPlaybackController()
   let exporter: NativeExportController
 
-  private var startOffsets: [Double] = []
+  private var timelineCoverage = TimelineCoverageMap(sets: [])
   private var observers: Set<AnyCancellable> = []
-  private var timelineAnchorDate: Date?
   private var currentSegmentStartSeconds: Double = 0
   private var currentSegmentClipIndex: Int?
   private var isUserSeeking = false
@@ -540,8 +522,7 @@ final class AppState: ObservableObject {
 
   private func rebuildTimeline() {
     guard !clipSets.isEmpty else {
-      timelineAnchorDate = nil
-      startOffsets = []
+      timelineCoverage = TimelineCoverageMap(sets: [])
       totalDuration = 0
       timelineGapRanges = []
       currentSegmentStartSeconds = 0
@@ -549,12 +530,9 @@ final class AppState: ObservableObject {
       return
     }
 
-    let anchor = clipSets.map(\.date).min() ?? clipSets[0].date
-    timelineAnchorDate = anchor
-    startOffsets = clipSets.map { max(0, $0.date.timeIntervalSince(anchor)) }
-    let maxEndDate = clipSets.map(\.endDate).max() ?? clipSets[0].endDate
-    totalDuration = max(1.0 / 30.0, maxEndDate.timeIntervalSince(anchor))
-    timelineGapRanges = TimelineGapRange.ranges(for: clipSets, minimumDuration: 5)
+    timelineCoverage = TimelineCoverageMap(sets: clipSets)
+    totalDuration = timelineCoverage.totalDuration
+    timelineGapRanges = timelineCoverage.gapRanges(minimumDuration: 5)
     debug("timeline rebuilt: duration=\(Int(totalDuration)) gaps=\(timelineGapRanges.count)", category: "timeline")
     currentSegmentStartSeconds = 0
     currentSegmentClipIndex = clipSets.isEmpty ? nil : 0
@@ -599,90 +577,27 @@ final class AppState: ObservableObject {
   }
 
   private func date(forGlobalSeconds seconds: Double) -> Date {
-    guard let anchor = timelineAnchorDate else { return Date() }
-    let clamped = max(0, min(seconds, totalDuration))
-    return anchor.addingTimeInterval(clamped)
+    timelineCoverage.date(forGlobalSeconds: seconds) ?? Date()
   }
 
   private func globalSeconds(for date: Date) -> Double {
-    guard let anchor = timelineAnchorDate else { return 0 }
-    let seconds = date.timeIntervalSince(anchor)
-    return max(0, min(seconds, totalDuration))
+    timelineCoverage.globalSeconds(for: date)
   }
 
   private func clipStartOffset(at index: Int) -> Double {
-    startOffsets[safe: index] ?? 0
+    timelineCoverage.clipStartOffset(at: index)
   }
 
   private func activeClipIndex(at globalSeconds: Double) -> Int? {
-    guard !clipSets.isEmpty else { return nil }
-    let clamped = max(0, min(globalSeconds, totalDuration))
-    var active: Int?
-    for index in clipSets.indices {
-      let start = clipStartOffset(at: index)
-      let end = start + clipSets[index].duration
-      if clamped >= start && clamped < end {
-        active = index
-      } else if abs(clamped - end) < 0.001 {
-        active = index
-      }
-    }
-    return active
+    timelineCoverage.activeClipIndex(at: globalSeconds)
   }
 
   private func nearestClipIndex(to globalSeconds: Double) -> Int {
-    if let active = activeClipIndex(at: globalSeconds) {
-      return active
-    }
-    var candidate = 0
-    for index in clipSets.indices {
-      if clipStartOffset(at: index) <= globalSeconds {
-        candidate = index
-      } else {
-        break
-      }
-    }
-    return candidate
+    timelineCoverage.nearestClipIndex(to: globalSeconds)
   }
 
   private func timelineSegment(at globalSeconds: Double) -> TimelinePlaybackSegment {
-    guard !clipSets.isEmpty else {
-      return TimelinePlaybackSegment(
-        clipIndex: nil,
-        startSeconds: 0,
-        duration: max(1.0 / 30.0, totalDuration)
-      )
-    }
-
-    let clamped = max(0, min(globalSeconds, totalDuration))
-    if let clipIndex = activeClipIndex(at: clamped) {
-      return TimelinePlaybackSegment(
-        clipIndex: clipIndex,
-        startSeconds: clipStartOffset(at: clipIndex),
-        duration: max(1.0 / 30.0, clipSets[clipIndex].duration)
-      )
-    }
-
-    var previousCoveredEnd: Double = 0
-    var nextStart: Double = totalDuration
-    for index in clipSets.indices {
-      let start = clipStartOffset(at: index)
-      let end = start + clipSets[index].duration
-      if start <= clamped {
-        previousCoveredEnd = max(previousCoveredEnd, end)
-      } else {
-        nextStart = start
-        break
-      }
-    }
-
-    let startSeconds = min(max(previousCoveredEnd, 0), totalDuration)
-    let endSeconds = max(startSeconds + (1.0 / 30.0), min(nextStart, totalDuration))
-    return TimelinePlaybackSegment(
-      clipIndex: nil,
-      startSeconds: startSeconds,
-      duration: endSeconds - startSeconds
-    )
+    timelineCoverage.playbackSegment(at: globalSeconds)
   }
 
   private func advanceToNextTimelineSegment() {
@@ -968,7 +883,7 @@ final class AppState: ObservableObject {
   private func buildOutputURL(from chosenURL: URL) -> URL {
     var outputURL = chosenURL
     if (try? chosenURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-      outputURL = chosenURL.appendingPathComponent(defaultExportFilename())
+      outputURL = firstAvailableOutputURL(in: chosenURL, preferredFilename: defaultExportFilename())
     }
 
     let expectedExtension = exportPreset.defaultExtension
@@ -976,7 +891,42 @@ final class AppState: ObservableObject {
       outputURL.deletePathExtension()
       outputURL.appendPathExtension(expectedExtension)
     }
-    return outputURL
+    return uniqueAvailableOutputURL(for: outputURL)
+  }
+
+  func resolvedExportURL(forTesting chosenURL: URL) -> URL {
+    buildOutputURL(from: chosenURL)
+  }
+
+  private func firstAvailableOutputURL(in directory: URL, preferredFilename: String) -> URL {
+    uniqueAvailableOutputURL(for: directory.appendingPathComponent(preferredFilename))
+  }
+
+  private func uniqueAvailableOutputURL(for preferredURL: URL) -> URL {
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: preferredURL.path) else {
+      return preferredURL
+    }
+
+    let directory = preferredURL.deletingLastPathComponent()
+    let baseName = preferredURL.deletingPathExtension().lastPathComponent
+    let pathExtension = preferredURL.pathExtension
+
+    for suffix in 2...999 {
+      var candidate = directory.appendingPathComponent("\(baseName)-\(suffix)")
+      if !pathExtension.isEmpty {
+        candidate.appendPathExtension(pathExtension)
+      }
+      if !fileManager.fileExists(atPath: candidate.path) {
+        return candidate
+      }
+    }
+
+    var fallback = directory.appendingPathComponent("\(baseName)-\(UUID().uuidString.prefix(8))")
+    if !pathExtension.isEmpty {
+      fallback.appendPathExtension(pathExtension)
+    }
+    return fallback
   }
 
   private func makeExportRequest(for chosenURL: URL) -> ExportRequest? {
@@ -1054,18 +1004,28 @@ final class AppState: ObservableObject {
   }
 
   private func presentDuplicateResolverIfNeeded(for index: ClipIndex) {
-    guard index.duplicateSummary.hasConflicts else { return }
-    guard duplicatePolicy != .mergeByTime || showDuplicateResolverForConflicts else { return }
+    presentDuplicateResolverIfNeeded(summary: index.duplicateSummary)
+  }
+
+  private func presentDuplicateResolverIfNeeded(summary: DuplicateResolutionSummary) {
+    guard summary.hasConflicts else { return }
+    guard duplicatePolicy == .mergeByTime || showDuplicateResolverForConflicts else { return }
     var parts: [String] = []
-    if index.duplicateSummary.duplicateTimestampCount > 0 {
-      parts.append("\(index.duplicateSummary.duplicateTimestampCount) timestamp collision(s)")
+    if summary.duplicateTimestampCount > 0 {
+      parts.append("\(summary.duplicateTimestampCount) timestamp collision(s)")
     }
-    if index.duplicateSummary.overlapMinuteCount > 0 {
-      parts.append("\(index.duplicateSummary.overlapMinuteCount) overlap(s)")
+    if summary.overlapMinuteCount > 0 {
+      parts.append("\(summary.overlapMinuteCount) overlap(s)")
     }
     duplicateResolverMessage = parts.joined(separator: " • ")
     isDuplicateResolverPresented = true
   }
+
+  #if DEBUG
+  func presentDuplicateResolverIfNeededForTesting(summary: DuplicateResolutionSummary) {
+    presentDuplicateResolverIfNeeded(summary: summary)
+  }
+  #endif
 
   #if DEBUG
   private func applyDebugLaunchModeIfNeeded() -> Bool {
@@ -1106,11 +1066,11 @@ final class AppState: ObservableObject {
     if let raw = environment[DebugEnvironment.exportDirectory], !raw.isEmpty {
       let candidate = URL(fileURLWithPath: raw, isDirectory: true)
       if ensureWritableDirectory(candidate, fileManager: fileManager) {
-        return candidate.appendingPathComponent(defaultExportFilename())
+        return firstAvailableOutputURL(in: candidate, preferredFilename: defaultExportFilename())
       }
     }
 
-    return fallbackDirectory.appendingPathComponent(defaultExportFilename())
+    return firstAvailableOutputURL(in: fallbackDirectory, preferredFilename: defaultExportFilename())
   }
 
   private func ensureWritableDirectory(_ directory: URL, fileManager: FileManager) -> Bool {

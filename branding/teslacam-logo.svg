@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <style>
+      .outer { fill: none; stroke: #544ea9; stroke-width: 104; }
+      .inner { fill: none; stroke: #e9e9eb; stroke-width: 86; }
+      .core { fill: #5a4aa8; }
+      .tick { fill: none; stroke: #4ea0f8; stroke-width: 18; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <circle class="outer" cx="512" cy="512" r="388"/>
+  <circle class="inner" cx="512" cy="512" r="280"/>
+  <circle class="core" cx="512" cy="512" r="224"/>
+  <circle class="tick" cx="512" cy="512" r="100"/>
+  <path class="tick" d="M512 130 V 92"/>
+</svg>

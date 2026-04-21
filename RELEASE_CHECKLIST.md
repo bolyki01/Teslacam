@@ -5,7 +5,7 @@
 - app opens on onboarding from cold launch
 - choose-folder flow indexes clips and reaches the loaded timeline
 - true-time gaps show in the timeline and preview as no-recording
-- `From`, `Export Video`, and `To` align and match size
+- loaded export card shows range, preset, duplicate handling, camera toggles, and export warnings without layout breakage
 - HW4 names `left`, `right`, `left_pillar`, `right_pillar` parse and export in centered 3x3 layout
 
 ## Mac App Store
@@ -20,6 +20,7 @@
 
 - native export is the only shipping app path
 - cancel, retry, and reveal-file flows work
+- directory export naming picks a unique filename when the first choice already exists
 - hidden-camera warnings match actual missing cameras
 - composite export is rendered output, not passthrough
 
@@ -33,5 +34,5 @@
 ## Tests
 
 - run `script/test_native.sh`
-- run `python3 -m unittest tests.test_scanner tests.test_layouts tests.test_timing`
+- run `python3 -m unittest tests.test_scanner tests.test_layouts tests.test_timing tests.test_cli`
 - run `python3 -m unittest tests.test_integration` when ffmpeg fixtures are available

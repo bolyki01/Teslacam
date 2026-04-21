@@ -133,6 +133,25 @@ def probe_dimensions(ffprobe: Path, media_path: Path) -> Optional[Dimensions]:
 
 
 
+def probe_has_video_stream(ffprobe: Path, media_path: Path) -> bool:
+    payload = _probe_json(str(ffprobe), str(media_path), "stream=codec_type,width,height")
+    streams = payload.get("streams") if isinstance(payload, dict) else None
+    if not isinstance(streams, list):
+        return False
+    for stream in streams:
+        if not isinstance(stream, dict):
+            continue
+        codec_type = stream.get("codec_type")
+        width = stream.get("width")
+        height = stream.get("height")
+        if codec_type == "video":
+            if isinstance(width, int) and isinstance(height, int):
+                return width > 0 and height > 0
+            return True
+    return False
+
+
+
 def probe_duration(ffprobe: Path, media_path: Path) -> float:
     payload = _probe_json(str(ffprobe), str(media_path), "format=duration")
     fmt = payload.get("format") if isinstance(payload, dict) else None

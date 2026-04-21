@@ -273,6 +273,106 @@ struct TeslaCamTests {
     #expect(gaps.isEmpty)
   }
 
+  @Test func timelineCoverageMapReturnsGapSegmentBetweenClips() async throws {
+    let anchor = Date(timeIntervalSince1970: 1_700_000_000)
+    let coverage = TimelineCoverageMap(sets: [
+      ClipSet(timestamp: "a", date: anchor, duration: 50, files: [:]),
+      ClipSet(timestamp: "b", date: anchor.addingTimeInterval(80), duration: 60, files: [:])
+    ])
+
+    #expect(coverage.activeClipIndex(at: 10) == 0)
+    #expect(coverage.activeClipIndex(at: 60) == nil)
+
+    let gap = coverage.playbackSegment(at: 60)
+    #expect(gap.clipIndex == nil)
+    #expect(abs(gap.startSeconds - 50) < 0.001)
+    #expect(abs(gap.duration - 30) < 0.001)
+  }
+
+  @Test func timelineCoverageMapCountsCompletedClipsByEndTime() async throws {
+    let anchor = Date(timeIntervalSince1970: 1_700_000_000)
+    let coverage = TimelineCoverageMap(sets: [
+      ClipSet(timestamp: "a", date: anchor, duration: 50, files: [:]),
+      ClipSet(timestamp: "b", date: anchor.addingTimeInterval(80), duration: 60, files: [:]),
+      ClipSet(timestamp: "c", date: anchor.addingTimeInterval(170), duration: 30, files: [:])
+    ])
+
+    #expect(coverage.completedClipCount(at: 49.9) == 0)
+    #expect(coverage.completedClipCount(at: 50) == 1)
+    #expect(coverage.completedClipCount(at: 139.9) == 1)
+    #expect(coverage.completedClipCount(at: 200) == 3)
+  }
+
+  @Test func timelineCoverageMapPreservesOriginalIndicesForUnsortedSets() async throws {
+    let anchor = Date(timeIntervalSince1970: 1_700_000_000)
+    let sets = [
+      ClipSet(timestamp: "late", date: anchor.addingTimeInterval(120), duration: 30, files: [:]),
+      ClipSet(timestamp: "early", date: anchor, duration: 30, files: [:])
+    ]
+    let coverage = TimelineCoverageMap(sets: sets)
+
+    #expect(coverage.activeClipIndex(at: 5) == 1)
+    #expect(coverage.nearestClipIndex(to: 60) == 1)
+    #expect(coverage.activeClipIndex(at: 125) == 0)
+  }
+
+  @Test func exportDirectoryNamingAvoidsExistingFiles() async throws {
+    let root = try TemporaryDirectory.make()
+    defer { try? root.remove() }
+
+    let state = AppState()
+    state.clipSets = [
+      ClipSet(timestamp: "a", date: Date(timeIntervalSince1970: 1_700_000_000), duration: 60, files: [:])
+    ]
+    state.selectedExportCameras = [.front]
+    state.layoutProfile = .hw3FourCam
+    state.exportPreset = .maxQualityHEVC
+    state.rebuildTimelineForTesting()
+
+    let initial = state.resolvedExportURL(forTesting: root.url)
+    try Data().write(to: initial)
+
+    let resolved = state.resolvedExportURL(forTesting: root.url)
+
+    #expect(resolved.lastPathComponent == "\(initial.deletingPathExtension().lastPathComponent)-2.mp4")
+  }
+
+  @Test func exportFileNamingAvoidsExistingFiles() async throws {
+    let root = try TemporaryDirectory.make()
+    defer { try? root.remove() }
+
+    let chosen = root.url.appendingPathComponent("manual-export.mp4")
+    try Data().write(to: chosen)
+
+    let state = AppState()
+    state.exportPreset = .maxQualityHEVC
+
+    let resolved = state.resolvedExportURL(forTesting: chosen)
+
+    #expect(resolved.lastPathComponent == "manual-export-2.mp4")
+  }
+
+  @Test func duplicateResolverDefaultsToMergePolicyOnly() async throws {
+    let state = AppState()
+    let summary = DuplicateResolutionSummary(
+      duplicateFileCount: 2,
+      duplicateTimestampCount: 1,
+      overlapMinuteCount: 1
+    )
+
+    state.presentDuplicateResolverIfNeededForTesting(summary: summary)
+    #expect(state.isDuplicateResolverPresented)
+
+    state.dismissDuplicateResolver()
+    state.chooseDuplicatePolicy(.keepAll)
+    state.presentDuplicateResolverIfNeededForTesting(summary: summary)
+    #expect(!state.isDuplicateResolverPresented)
+
+    state.showDuplicateResolverForConflicts = true
+    state.presentDuplicateResolverIfNeededForTesting(summary: summary)
+    #expect(state.isDuplicateResolverPresented)
+  }
+
   @Test func indexUsesRealClipDurationAndDetectsFourCamProfile() async throws {
     let root = try TemporaryDirectory.make()
     defer { try? root.remove() }

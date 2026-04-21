@@ -439,7 +439,16 @@ private struct TimelineExportCard: View {
       .font(TeslaCamTheme.Typography.monoDetail)
       .foregroundColor(TeslaCamTheme.Colors.textTertiary)
 
-      HStack(alignment: .center, spacing: 12) {
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ExportStatBadge(title: "Selected", value: formatHMS(state.selectedTrimDuration))
+          ExportStatBadge(title: "Spans", value: "\(state.selectedSetsForExport.count)")
+          ExportStatBadge(title: "Cameras", value: "\(state.activeExportCameras.count)/\(max(state.camerasDetected.count, 1))")
+          ExportStatBadge(title: "Preset", value: state.exportPreset.displayName)
+        }
+      }
+
+      HStack(alignment: .top, spacing: 12) {
         RangeControlCard(title: "From") {
           DatePicker(
             "",
@@ -454,12 +463,15 @@ private struct TimelineExportCard: View {
           .datePickerStyle(.field)
         }
 
-        Button("Export Video") { state.exportRange() }
-          .buttonStyle(PrimaryButtonStyle())
-          .disabled(state.clipSets.isEmpty || state.exporter.isExporting)
-          .accessibilityLabel("Export Video")
-          .accessibilityIdentifier("export-video")
-          .frame(maxWidth: .infinity)
+        RangeControlCard(title: "Export Preset") {
+          Picker("", selection: $state.exportPreset) {
+            ForEach(ExportPreset.allCases) { preset in
+              Text(preset.displayName).tag(preset)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+        }
 
         RangeControlCard(title: "To") {
           DatePicker(
@@ -476,6 +488,103 @@ private struct TimelineExportCard: View {
         }
       }
       .frame(minHeight: TeslaCamTheme.Metrics.controlHeight)
+
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+          Text("Quick Range")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+
+          ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+              Button("Whole Timeline") { state.setFullRange() }
+                .buttonStyle(QuickActionButtonStyle())
+              Button("Current Minute") { state.setCurrentMinuteRange() }
+                .buttonStyle(QuickActionButtonStyle())
+              Button("Last 5m") { state.setRecentRange(minutes: 5) }
+                .buttonStyle(QuickActionButtonStyle())
+              Button("Last 15m") { state.setRecentRange(minutes: 15) }
+                .buttonStyle(QuickActionButtonStyle())
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minHeight: TeslaCamTheme.Metrics.controlHeight, alignment: .topLeading)
+        .teslaCamCard(fill: TeslaCamTheme.Colors.surface, radius: TeslaCamTheme.Metrics.controlCorner)
+
+        RangeControlCard(title: "Duplicate Handling") {
+          Picker(
+            "",
+            selection: Binding(
+              get: { state.duplicatePolicy },
+              set: { state.updateDuplicatePolicy($0) }
+            )
+          ) {
+            ForEach(DuplicateClipPolicy.allCases) { policy in
+              Text(policy.displayName).tag(policy)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+        }
+
+        ExportActionCard(state: state)
+      }
+
+      VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .center, spacing: 8) {
+          Text("Cameras")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+
+          if state.camerasDetected.isEmpty {
+            Text("No cameras detected yet")
+              .font(.system(size: 11))
+              .foregroundColor(TeslaCamTheme.Colors.textSecondary)
+          }
+        }
+
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 8) {
+            ForEach(state.camerasDetected, id: \.self) { camera in
+              ExportCameraChip(
+                title: camera.displayName,
+                enabled: state.activeExportCameras.contains(camera)
+              ) {
+                let isEnabled = state.activeExportCameras.contains(camera)
+                state.toggleExportCamera(camera, isEnabled: !isEnabled)
+              }
+            }
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      if !state.duplicateSummaryText.isEmpty {
+        ExportInfoBanner(
+          title: "Duplicates",
+          message: state.duplicateSummaryText,
+          systemImage: "square.on.square"
+        )
+      }
+
+      if let healthSummary = state.healthSummary {
+        ExportInfoBanner(
+          title: "Coverage",
+          message: coverageSummary(for: healthSummary),
+          systemImage: "waveform.path.ecg"
+        )
+      }
+
+      ForEach(state.exportWarningsPreview, id: \.self) { warning in
+        ExportInfoBanner(
+          title: "Export warning",
+          message: warning,
+          systemImage: "exclamationmark.triangle.fill"
+        )
+      }
     }
     .padding(TeslaCamTheme.Metrics.cardPadding)
     .teslaCamCard()
@@ -510,6 +619,132 @@ private struct TimelineExportCard: View {
 
   private func formattedTimelineDate(_ date: Date) -> String {
     TeslaCamFormatters.selectedRange.string(from: date)
+  }
+
+  private func coverageSummary(for summary: ExportHealthSummary) -> String {
+    var parts = [
+      "\(summary.totalMinutes)m timeline",
+      "\(summary.gapCount) gap\(summary.gapCount == 1 ? "" : "s")",
+      "\(summary.partialSetCount) partial span\(summary.partialSetCount == 1 ? "" : "s")"
+    ]
+
+    if summary.hasMixedCoverage {
+      parts.append("mixed 4- and 6-camera coverage")
+    }
+
+    if !summary.missingCoverageSummary.isEmpty {
+      parts.append(summary.missingCoverageSummary)
+    }
+
+    return parts.joined(separator: " • ")
+  }
+}
+
+private struct ExportStatBadge: View {
+  let title: String
+  let value: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title.uppercased())
+        .font(.system(size: 9, weight: .semibold))
+        .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+      Text(value)
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundColor(TeslaCamTheme.Colors.textPrimary)
+        .lineLimit(1)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .teslaCamCard(fill: TeslaCamTheme.Colors.surface, radius: 12)
+  }
+}
+
+private struct ExportActionCard: View {
+  @ObservedObject var state: AppState
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text("Export")
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+
+      Text(state.selectedRangeDescription)
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        .foregroundColor(TeslaCamTheme.Colors.textSecondary)
+        .lineLimit(2)
+
+      Button("Export Video") { state.exportRange() }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(state.clipSets.isEmpty || state.exporter.isExporting)
+        .accessibilityLabel("Export Video")
+        .accessibilityIdentifier("export-video")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
+    .frame(minHeight: TeslaCamTheme.Metrics.controlHeight, alignment: .topLeading)
+    .teslaCamCard(fill: TeslaCamTheme.Colors.surface, radius: TeslaCamTheme.Metrics.controlCorner)
+  }
+}
+
+private struct ExportCameraChip: View {
+  let title: String
+  let enabled: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 6) {
+        Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 12, weight: .semibold))
+        Text(title)
+          .font(.system(size: 12, weight: .semibold))
+      }
+      .foregroundColor(enabled ? TeslaCamTheme.Colors.textPrimary : TeslaCamTheme.Colors.textSecondary)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 9)
+      .background(
+        RoundedRectangle(cornerRadius: TeslaCamTheme.Metrics.compactCorner, style: .continuous)
+          .fill(enabled ? TeslaCamTheme.Colors.surfaceElevated : TeslaCamTheme.Colors.surface)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: TeslaCamTheme.Metrics.compactCorner, style: .continuous)
+          .stroke(enabled ? TeslaCamTheme.Colors.accent.opacity(0.7) : TeslaCamTheme.Colors.stroke, lineWidth: 1)
+      )
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(title)
+    .accessibilityValue(enabled ? "Included" : "Excluded")
+  }
+}
+
+private struct ExportInfoBanner: View {
+  let title: String
+  let message: String
+  let systemImage: String
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: systemImage)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundColor(TeslaCamTheme.Colors.textSecondary)
+        .padding(.top, 2)
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title.uppercased())
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+        Text(message)
+          .font(.system(size: 12))
+          .foregroundColor(TeslaCamTheme.Colors.textSecondary)
+      }
+
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
+    .teslaCamCard(fill: TeslaCamTheme.Colors.surface, radius: 12)
   }
 }
 

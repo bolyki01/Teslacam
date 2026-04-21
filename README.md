@@ -12,8 +12,10 @@ The macOS app now uses a native Swift export path. The CLI keeps the earlier por
 - new interactive CLI: `teslacam-cli`
 - cross-platform launcher scripts: `teslacam-cli`, `teslacam-cli.bat`, `teslacam.sh`
 - exact time trimming to the second for first/last overlapping clip sets
+- safer duplicate resolution and output conflict handling in the CLI
 - native-resolution-first layout sizing; no forced downscale of camera tiles
 - onboarding-first app launch; no automatic source restore on startup
+- loaded timeline card now includes inline range, preset, duplicate, and camera export controls
 - true-time timeline with visible recording gaps
 - default output: HEVC/H.265 MP4 with `hvc1` tag for broad player compatibility, including VLC
 - zero third-party Python package dependencies
@@ -31,6 +33,7 @@ On macOS, the CLI can also use bundled `TeslaCam/Resources/ffmpeg_bin/ffmpeg` an
 
 - startup always begins on onboarding until the user chooses a source folder
 - timeline spacing follows real recording time from first clip to last clip
+- loaded timeline view surfaces quick range actions, export preset, duplicate handling, and per-camera export toggles
 - uncovered spans are shown as visible gaps and preview as "no recording"
 - HW4 sources with `left`, `right`, `left_pillar`, and `right_pillar` are detected automatically
 - HW4 composite export uses a centered 3x3 layout
@@ -75,8 +78,10 @@ The interactive mode prompts for:
 3. exact start time
 4. exact end time
 5. output mode
-6. output MP4 path
+6. output MP4 path or output directory
 7. optional work directory retention
+
+When duplicate clips are detected, the CLI reports the conflict counts up front and applies the selected duplicate policy consistently with the macOS app.
 
 ## Non-interactive examples
 
@@ -107,6 +112,15 @@ python3 teslacam.py /path/to/TeslaCam \
   --workdir /path/to/work
 ```
 
+Resolve duplicate clips by newest file and avoid overwriting an existing export:
+
+```sh
+python3 teslacam.py /path/to/TeslaCam \
+  --duplicate-policy prefer-newest \
+  --output-conflict unique \
+  --output /path/to/output
+```
+
 ## Output modes
 
 - `lossless` — default. H.265/HEVC MP4 using `libx265` lossless mode. Largest files. Best fidelity.
@@ -115,7 +129,7 @@ python3 teslacam.py /path/to/TeslaCam \
 ## Layout behavior
 
 - `auto` chooses 6-camera if HW4 `left` / `right` or pillar clips are present, otherwise 4-camera
-- missing cameras render as black placeholders
+- missing, unreadable, or corrupt cameras render as black placeholders instead of aborting the whole export
 - HW4 composite layout uses a centered 3x3 canvas with intentional empty cells
 - 4-camera layout uses per-row and per-column maxima from probed source clips
 - HW4 3x3 layout uses a uniform tile size based on the largest detected source clip
@@ -132,7 +146,7 @@ python3 teslacam.py /path/to/TeslaCam \
 Unit tests:
 
 ```sh
-python3 -m unittest tests.test_scanner tests.test_layouts tests.test_timing
+python3 -m unittest tests.test_scanner tests.test_layouts tests.test_timing tests.test_cli
 ```
 
 Native app tests:
@@ -151,6 +165,12 @@ Integration smoke test with ffmpeg:
 
 ```sh
 python3 -m unittest tests.test_integration
+```
+
+Combined Python verification:
+
+```sh
+python3 -m unittest tests.test_scanner tests.test_layouts tests.test_timing tests.test_cli tests.test_integration
 ```
 
 ## Notes

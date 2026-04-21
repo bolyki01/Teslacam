@@ -19,13 +19,15 @@
 
 - native export writes progress and phase details to the app log file
 - use the in-app `Show Log` action after a failed or cancelled export
-- compare requested trim range, selected cameras, layout canvas size, and final phase
+- compare requested trim range, selected cameras, layout canvas size, duplicate policy, and final phase
+- confirm existing-output exports choose a unique filename instead of clobbering the first file
 
 ## Reliability checks
 
 - inspect debug events for:
   - indexing start and completion
   - detected camera set and layout profile
+  - duplicate summary and chosen duplicate policy
   - derived gap count
   - seek begin, live segment loads, and exact seek end
   - clip load vs gap load
@@ -45,3 +47,10 @@
 - confirm the scanner groups them into one timestamped set
 - confirm the native app and CLI both choose HW4 layout
 - confirm HW4 export uses the centered 3x3 composite
+
+## CLI checks
+
+- verify `teslacam-cli --duplicate-policy` accepts `merge-by-time`, `keep-all`, and `prefer-newest`
+- verify `--output-conflict` accepts `unique`, `overwrite`, and `error`
+- verify passing an output directory produces a timestamped MP4 inside that directory
+- verify corrupt or unreadable camera clips render as black tiles, not a hard failure

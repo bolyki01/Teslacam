@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set
 
 
 class Camera(str, Enum):
@@ -56,6 +56,34 @@ MIXED_CAMERA_ORDER = [
 class LayoutKind(str, Enum):
     FOUR_UP = "4up"
     SIX_UP = "6up"
+
+
+class DuplicatePolicy(str, Enum):
+    MERGE_BY_TIME = "merge-by-time"
+    KEEP_ALL = "keep-all"
+    PREFER_NEWEST = "prefer-newest"
+
+    @property
+    def display_name(self) -> str:
+        return {
+            DuplicatePolicy.MERGE_BY_TIME: "Merge by time",
+            DuplicatePolicy.KEEP_ALL: "Keep all",
+            DuplicatePolicy.PREFER_NEWEST: "Prefer newest",
+        }[self]
+
+
+class OutputConflictPolicy(str, Enum):
+    UNIQUE = "unique"
+    OVERWRITE = "overwrite"
+    ERROR = "error"
+
+    @property
+    def display_name(self) -> str:
+        return {
+            OutputConflictPolicy.UNIQUE: "Create a unique filename",
+            OutputConflictPolicy.OVERWRITE: "Overwrite existing file",
+            OutputConflictPolicy.ERROR: "Fail if the output exists",
+        }[self]
 
 
 @dataclass(frozen=True)
@@ -125,3 +153,15 @@ class ComposePlan:
     workdir: Path
     keep_workdir: bool
     loglevel: str
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    clip_sets: List[ClipSet]
+    cameras: Set[Camera]
+    duplicate_file_count: int
+    duplicate_timestamp_count: int
+
+    @property
+    def has_conflicts(self) -> bool:
+        return self.duplicate_file_count > 0 or self.duplicate_timestamp_count > 0
