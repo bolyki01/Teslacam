@@ -1,7 +1,10 @@
 import Foundation
 import Combine
-import AppKit
 import UniformTypeIdentifiers
+
+#if canImport(AppKit)
+import AppKit
+#endif
 
 final class AppState: ObservableObject {
   private enum StorageKey {
@@ -134,20 +137,25 @@ final class AppState: ObservableObject {
     )
   }
 
+  /// On iPad this is a no-op; the view layer uses SwiftUI `.fileImporter`.
+  @Published var isFileImporterPresented: Bool = false
+  /// On iPad, set when the user needs to pick an export destination.
+  @Published var isFileExporterPresented: Bool = false
+  /// iPad export scratch URL for sharing.
+  @Published var pendingExportScratchURL: URL?
+
   func chooseFolder() {
     guard !exporter.isExporting else { return }
-    NSApp.activate(ignoringOtherApps: true)
-    let panel = NSOpenPanel()
-    panel.title = "Select TeslaCam Files/Folders"
-    panel.canChooseDirectories = true
-    panel.canChooseFiles = true
-    panel.allowsMultipleSelection = true
-    panel.prompt = "Choose"
-    panel.directoryURL = sourceURLs.first?.deletingLastPathComponent() ?? rootURL
-
-    presentOpenPanel(panel) { [weak self] urls in
+    #if os(macOS)
+    PlatformFileAccess.activateApp()
+    PlatformFileAccess.chooseFolder(
+      directoryURL: sourceURLs.first?.deletingLastPathComponent() ?? rootURL
+    ) { [weak self] urls in
       self?.indexSources(urls)
     }
+    #else
+    isFileImporterPresented = true
+    #endif
   }
 
   func indexFolder(_ url: URL) {
@@ -331,17 +339,22 @@ final class AppState: ObservableObject {
     }
 #endif
 
-    let panel = NSSavePanel()
-    panel.title = "Save Export"
-    panel.nameFieldStringValue = defaultExportFilename()
-    panel.canCreateDirectories = true
-    panel.allowedContentTypes = exportPreset.defaultExtension == "mov" ? [.movie] : [.mpeg4Movie]
-    panel.directoryURL = rootURL?.deletingLastPathComponent() ?? sourceURLs.first?.deletingLastPathComponent()
-
-    presentSavePanel(panel) { [weak self] url in
+    #if os(macOS)
+    PlatformFileAccess.presentSavePanel(
+      nameFieldStringValue: defaultExportFilename(),
+      allowedContentTypes: PlatformFileAccess.contentTypes(for: exportPreset),
+      directoryURL: rootURL?.deletingLastPathComponent() ?? sourceURLs.first?.deletingLastPathComponent()
+    ) { [weak self] url in
       self?.exportRange(to: url)
-      return
     }
+    #else
+    // On iPad, export to app scratch space, then offer share.
+    let scratchDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("teslacam_export", isDirectory: true)
+    try? FileManager.default.createDirectory(at: scratchDir, withIntermediateDirectories: true)
+    let outputURL = scratchDir.appendingPathComponent(defaultExportFilename())
+    exportRange(to: outputURL)
+    #endif
   }
 
   func cancelExport() {
@@ -350,7 +363,13 @@ final class AppState: ObservableObject {
   }
 
   func revealLastExport() {
+    #if os(macOS)
     exporter.revealOutput(for: exporter.exportHistory.first)
+    #else
+    if let url = exporter.exportHistory.first?.outputURL {
+      PlatformFileAccess.shareFile(url)
+    }
+    #endif
   }
 
   func dismissExportStatus() {
@@ -794,7 +813,7 @@ final class AppState: ObservableObject {
   private func rememberLastSources(_ urls: [URL]) {
     let bookmarks = urls.compactMap { url -> Data? in
       try? url.bookmarkData(
-        options: [.withSecurityScope],
+        options: PlatformFileAccess.bookmarkCreationOptions,
         includingResourceValuesForKeys: nil,
         relativeTo: nil
       )
@@ -815,7 +834,7 @@ final class AppState: ObservableObject {
       var stale = false
       guard let url = try? URL(
         resolvingBookmarkData: bookmark,
-        options: [.withSecurityScope],
+        options: PlatformFileAccess.bookmarkResolutionOptions,
         relativeTo: nil,
         bookmarkDataIsStale: &stale
       ) else {
@@ -825,7 +844,7 @@ final class AppState: ObservableObject {
       restored.append(url)
       if stale,
          let refreshed = try? url.bookmarkData(
-          options: [.withSecurityScope],
+          options: PlatformFileAccess.bookmarkCreationOptions,
           includingResourceValuesForKeys: nil,
           relativeTo: nil
          ) {
@@ -1091,18 +1110,9 @@ final class AppState: ObservableObject {
   }
   #endif
 
+  #if os(macOS)
   private func presentOpenPanel(_ panel: NSOpenPanel, completion: @escaping ([URL]) -> Void) {
-    if let window = NSApp.keyWindow {
-      panel.beginSheetModal(for: window) { response in
-        guard response == .OK else { return }
-        completion(panel.urls)
-      }
-      return
-    }
-
-    if panel.runModal() == .OK {
-      completion(panel.urls)
-    }
+    PlatformFileAccess.presentOpenPanel(panel, completion: completion)
   }
 
   private func presentSavePanel(_ panel: NSSavePanel, completion: @escaping (URL) -> Void) {
@@ -1118,6 +1128,7 @@ final class AppState: ObservableObject {
       completion(url)
     }
   }
+  #endif
 
   private func loadSampleTimeline() {
     let base = Date()
@@ -1130,8 +1141,8 @@ final class AppState: ObservableObject {
     clipSets = sampleSets
     minDate = sampleSets.first?.date
     maxDate = sampleSets.last?.endDate
-    layoutProfile = .hw3FourCam
-    camerasDetected = [.front, .back, .left_repeater, .right_repeater]
+    layoutProfile = .hw4SixCam
+    camerasDetected = [.front, .back, .left, .right, .left_pillar, .right_pillar]
     selectedExportCameras = Set(camerasDetected)
     exportPreset = .fastHEVC
     currentIndex = 0

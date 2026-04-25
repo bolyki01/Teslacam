@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0D99B7AF17EAC3FC2DE17FE4 /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685432F3526330073314B /* MetalRenderer.swift */; };
+		0FBCA1102A1866E4782AE742 /* LICENSES.md in Resources */ = {isa = PBXBuildFile; fileRef = 50C685392F3526330073314B /* LICENSES.md */; };
+		16112D2E1E4A55F25A463C45 /* TelemetryParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685472F3526330073314B /* TelemetryParser.swift */; };
+		195FACF22EF24C7709F0D524 /* Indexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685402F3526330073314B /* Indexer.swift */; };
+		2EB20178CD3CD202893526D6 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685452F3526330073314B /* Models.swift */; };
+		43856EFDACD28E283764B079 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50C6855D2F3526330073314B /* Assets.xcassets */; };
+		4AC0833CC400B8B020F17BB1 /* PlatformFileAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9A79DBE9E309C323846661 /* PlatformFileAccess.swift */; };
+		4FC3EC1D1A403F7C27D9DAC2 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685482F3526330073314B /* Utils.swift */; };
 		50C6854A2F3526330073314B /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685432F3526330073314B /* MetalRenderer.swift */; };
 		50C6854B2F3526330073314B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C6853E2F3526330073314B /* ContentView.swift */; };
 		50C6854C2F3526330073314B /* TelemetryParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685472F3526330073314B /* TelemetryParser.swift */; };
@@ -21,6 +29,16 @@
 		50C685582F3526330073314B /* LICENSES.md in Resources */ = {isa = PBXBuildFile; fileRef = 50C685392F3526330073314B /* LICENSES.md */; };
 		50C6855A2F3526330073314B /* NativeExportController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C6855C2F3526330073314B /* NativeExportController.swift */; };
 		50C6855E2F3526330073314B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50C6855D2F3526330073314B /* Assets.xcassets */; };
+		50F4EAD1A7AC5FC49F71BF31 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C6853D2F3526330073314B /* AppState.swift */; };
+		5E18ECCAC9BDFE1995BB9F3C /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6752ADD69F7C76B881977D4 /* Foundation.framework */; };
+		7651D245D03D9627B0901116 /* NativeExportController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C6855C2F3526330073314B /* NativeExportController.swift */; };
+		8878B92A5590887F535BD892 /* IPadMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FEA6CD4150968355138666 /* IPadMain.swift */; };
+		9D396087622135F7A72945A3 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685462F3526330073314B /* PlaybackController.swift */; };
+		B582B85BBFA5AFDD00630B73 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C6853E2F3526330073314B /* ContentView.swift */; };
+		C310E15FCC440A1D947222CD /* MetalPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C685422F3526330073314B /* MetalPlayerView.swift */; };
+		C31C5F6B1CDA0C816258DD9A /* MetalPlayerView_iPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7761E775BC37CD7C35A556C /* MetalPlayerView_iPad.swift */; };
+		CDDBB87778F9005CECFA36F5 /* PlatformFileAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9A79DBE9E309C323846661 /* PlatformFileAccess.swift */; };
+		DF1527E9A5192CB26430404E /* MetalShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 50C685442F3526330073314B /* MetalShaders.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +59,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		3027438A524246CA2FBF0C46 /* TeslaCam iPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TeslaCam iPad.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3615C866A634FF23B9D53ACE /* TeslaCam_iPad.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = TeslaCam_iPad.entitlements; sourceTree = "<group>"; };
 		508F32862F35259D005B7A80 /* TeslaCam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeslaCam.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		508F32952F35259E005B7A80 /* TeslaCamTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TeslaCamTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		508F329F2F35259E005B7A80 /* TeslaCamUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TeslaCamUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -60,16 +80,24 @@
 		50C6855B2F3526330073314B /* TeslaCam.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TeslaCam.entitlements; sourceTree = "<group>"; };
 		50C6855C2F3526330073314B /* NativeExportController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeExportController.swift; sourceTree = "<group>"; };
 		50C6855D2F3526330073314B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		53FEA6CD4150968355138666 /* IPadMain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IPadMain.swift; sourceTree = "<group>"; };
+		9B9A79DBE9E309C323846661 /* PlatformFileAccess.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlatformFileAccess.swift; sourceTree = "<group>"; };
+		E7761E775BC37CD7C35A556C /* MetalPlayerView_iPad.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetalPlayerView_iPad.swift; sourceTree = "<group>"; };
+		F6752ADD69F7C76B881977D4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		508F32982F35259E005B7A80 /* TeslaCamTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TeslaCamTests;
 			sourceTree = "<group>";
 		};
 		508F32A22F35259E005B7A80 /* TeslaCamUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TeslaCamUITests;
 			sourceTree = "<group>";
 		};
@@ -97,9 +125,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5F4581895736E49F4CF88D36 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E18ECCAC9BDFE1995BB9F3C /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0E0B13DFC4DE7972437FCA54 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				EBE5C67B2D234D602A1398B1 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		508F327D2F35259D005B7A80 = {
 			isa = PBXGroup;
 			children = (
@@ -107,6 +151,7 @@
 				508F32982F35259E005B7A80 /* TeslaCamTests */,
 				508F32A22F35259E005B7A80 /* TeslaCamUITests */,
 				508F32872F35259D005B7A80 /* Products */,
+				0E0B13DFC4DE7972437FCA54 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -116,6 +161,7 @@
 				508F32862F35259D005B7A80 /* TeslaCam.app */,
 				508F32952F35259E005B7A80 /* TeslaCamTests.xctest */,
 				508F329F2F35259E005B7A80 /* TeslaCamUITests.xctest */,
+				3027438A524246CA2FBF0C46 /* TeslaCam iPad.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -147,8 +193,20 @@
 				50C685472F3526330073314B /* TelemetryParser.swift */,
 				50C685482F3526330073314B /* Utils.swift */,
 				50C6855B2F3526330073314B /* TeslaCam.entitlements */,
+				9B9A79DBE9E309C323846661 /* PlatformFileAccess.swift */,
+				E7761E775BC37CD7C35A556C /* MetalPlayerView_iPad.swift */,
+				53FEA6CD4150968355138666 /* IPadMain.swift */,
+				3615C866A634FF23B9D53ACE /* TeslaCam_iPad.entitlements */,
 			);
 			path = TeslaCam;
+			sourceTree = "<group>";
+		};
+		EBE5C67B2D234D602A1398B1 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				F6752ADD69F7C76B881977D4 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -167,8 +225,6 @@
 			dependencies = (
 			);
 			name = TeslaCam;
-			packageProductDependencies = (
-			);
 			productName = TeslaCam;
 			productReference = 508F32862F35259D005B7A80 /* TeslaCam.app */;
 			productType = "com.apple.product-type.application";
@@ -190,8 +246,6 @@
 				508F32982F35259E005B7A80 /* TeslaCamTests */,
 			);
 			name = TeslaCamTests;
-			packageProductDependencies = (
-			);
 			productName = TeslaCamTests;
 			productReference = 508F32952F35259E005B7A80 /* TeslaCamTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -213,11 +267,26 @@
 				508F32A22F35259E005B7A80 /* TeslaCamUITests */,
 			);
 			name = TeslaCamUITests;
-			packageProductDependencies = (
-			);
 			productName = TeslaCamUITests;
 			productReference = 508F329F2F35259E005B7A80 /* TeslaCamUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		58E24B27F497D1031AA1F4F7 /* TeslaCam iPad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BFBB806D9E8289F44D1E492D /* Build configuration list for PBXNativeTarget "TeslaCam iPad" */;
+			buildPhases = (
+				36928859B66757AD0B293483 /* Sources */,
+				5F4581895736E49F4CF88D36 /* Frameworks */,
+				973DF0D3E8743F9B5C41A14A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "TeslaCam iPad";
+			productName = "TeslaCam iPad";
+			productReference = 3027438A524246CA2FBF0C46 /* TeslaCam iPad.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -259,6 +328,7 @@
 				508F32852F35259D005B7A80 /* TeslaCam */,
 				508F32942F35259E005B7A80 /* TeslaCamTests */,
 				508F329E2F35259E005B7A80 /* TeslaCamUITests */,
+				58E24B27F497D1031AA1F4F7 /* TeslaCam iPad */,
 			);
 		};
 /* End PBXProject section */
@@ -287,9 +357,39 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		973DF0D3E8743F9B5C41A14A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0FBCA1102A1866E4782AE742 /* LICENSES.md in Resources */,
+				43856EFDACD28E283764B079 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		36928859B66757AD0B293483 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				50F4EAD1A7AC5FC49F71BF31 /* AppState.swift in Sources */,
+				B582B85BBFA5AFDD00630B73 /* ContentView.swift in Sources */,
+				195FACF22EF24C7709F0D524 /* Indexer.swift in Sources */,
+				0D99B7AF17EAC3FC2DE17FE4 /* MetalRenderer.swift in Sources */,
+				DF1527E9A5192CB26430404E /* MetalShaders.metal in Sources */,
+				C310E15FCC440A1D947222CD /* MetalPlayerView.swift in Sources */,
+				C31C5F6B1CDA0C816258DD9A /* MetalPlayerView_iPad.swift in Sources */,
+				2EB20178CD3CD202893526D6 /* Models.swift in Sources */,
+				7651D245D03D9627B0901116 /* NativeExportController.swift in Sources */,
+				9D396087622135F7A72945A3 /* PlaybackController.swift in Sources */,
+				4AC0833CC400B8B020F17BB1 /* PlatformFileAccess.swift in Sources */,
+				16112D2E1E4A55F25A463C45 /* TelemetryParser.swift in Sources */,
+				4FC3EC1D1A403F7C27D9DAC2 /* Utils.swift in Sources */,
+				8878B92A5590887F535BD892 /* IPadMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		508F32822F35259D005B7A80 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -306,6 +406,7 @@
 				50C685532F3526330073314B /* MetalShaders.metal in Sources */,
 				50C685542F3526330073314B /* Utils.swift in Sources */,
 				50C6855A2F3526330073314B /* NativeExportController.swift in Sources */,
+				CDDBB87778F9005CECFA36F5 /* PlatformFileAccess.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -339,11 +440,50 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		2A0143647DEFD0372DEAC353 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = TeslaCam/TeslaCam_iPad.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 3T84D5XQXL;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.magrathean.TeslaCam.iPad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
 		508F32A72F35259E005B7A80 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = arm64;
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -407,8 +547,8 @@
 		508F32A82F35259E005B7A80 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = arm64;
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -464,8 +604,8 @@
 		508F32AA2F35259E005B7A80 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = TeslaCam/TeslaCam.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -498,8 +638,8 @@
 		508F32AB2F35259E005B7A80 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = TeslaCam/TeslaCam.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -613,6 +753,44 @@
 			};
 			name = Release;
 		};
+		74419CE3A25A1A34F5D83ACC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = TeslaCam/TeslaCam_iPad.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 3T84D5XQXL;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportsDocumentBrowser = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.magrathean.TeslaCam.iPad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -648,6 +826,15 @@
 			buildConfigurations = (
 				508F32B02F35259E005B7A80 /* Debug */,
 				508F32B12F35259E005B7A80 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BFBB806D9E8289F44D1E492D /* Build configuration list for PBXNativeTarget "TeslaCam iPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				74419CE3A25A1A34F5D83ACC /* Release */,
+				2A0143647DEFD0372DEAC353 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

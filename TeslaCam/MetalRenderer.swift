@@ -300,7 +300,11 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
     for camera in cameraOrder {
       let onReady: () -> Void = { [weak view] in
         guard let view else { return }
+        #if os(macOS)
         view.needsDisplay = true
+        #else
+        view.setNeedsDisplay()
+        #endif
       }
       if let texture = frameCache.texture(
         for: camera,

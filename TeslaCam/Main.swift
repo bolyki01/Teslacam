@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 #if canImport(Sentry)
@@ -304,3 +305,4 @@ private struct DebugEventsCard: View {
     .teslaCamCard()
   }
 }
+#endif

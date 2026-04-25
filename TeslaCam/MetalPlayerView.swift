@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import AppKit
 import AVFoundation
@@ -50,3 +51,4 @@ struct MetalPlayerView: NSViewRepresentable {
     var renderer: MetalRenderer?
   }
 }
+#endif

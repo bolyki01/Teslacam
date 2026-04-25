@@ -53,6 +53,20 @@ enum Camera: String, CaseIterable, Hashable {
     case .right_pillar: return "Right Pillar"
     }
   }
+
+  /// Compact label for inline camera toggle buttons.
+  var shortName: String {
+    switch self {
+    case .front: return "Front"
+    case .back: return "Back"
+    case .left_repeater: return "L Rep"
+    case .right_repeater: return "R Rep"
+    case .left: return "Left"
+    case .right: return "Right"
+    case .left_pillar: return "L Pil"
+    case .right_pillar: return "R Pil"
+    }
+  }
 }
 
 enum CameraLayoutProfile: String, CaseIterable, Identifiable {

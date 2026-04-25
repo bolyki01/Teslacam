@@ -1,9 +1,16 @@
 import Foundation
 import Combine
-import AppKit
 import AVFoundation
 import CoreVideo
 import CoreGraphics
+
+#if canImport(AppKit)
+import AppKit
+#endif
+
+#if canImport(UIKit)
+import UIKit
+#endif
 
 final class NativeExportController: ObservableObject {
   private static let staleWorkdirAge: TimeInterval = 24 * 60 * 60
@@ -202,18 +209,26 @@ final class NativeExportController: ObservableObject {
   }
 
   func revealLog() {
+    #if os(macOS)
     NSWorkspace.shared.activateFileViewerSelecting([logFileURL])
+    #endif
   }
 
   func revealOutput(for snapshot: ExportJobSnapshot? = nil) {
     let url = (snapshot ?? currentJob)?.outputURL
     guard let url else { return }
+    #if os(macOS)
     NSWorkspace.shared.activateFileViewerSelecting([url])
+    #else
+    PlatformFileAccess.shareFile(url)
+    #endif
   }
 
   func revealWorkingFiles(for snapshot: ExportJobSnapshot? = nil) {
     guard let url = (snapshot ?? currentJob)?.workingDirectoryURL else { return }
+    #if os(macOS)
     NSWorkspace.shared.activateFileViewerSelecting([url])
+    #endif
   }
 
   private func performExport(request: ExportRequest) throws {
@@ -854,7 +869,7 @@ private final class TimelineFrameComposer {
       throw NSError(domain: "TeslaCam", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to create drawing context."])
     }
 
-    context.setFillColor(NSColor.black.cgColor)
+    context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
     context.fill(CGRect(origin: .zero, size: layout.canvasSize))
 
     guard let set else {

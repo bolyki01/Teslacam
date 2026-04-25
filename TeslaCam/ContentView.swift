@@ -24,7 +24,9 @@ struct ContentView: View {
         ExportOverlayCard(state: state, job: job)
       }
     }
+    #if os(macOS)
     .frame(minWidth: 1100, minHeight: 760)
+    #endif
     .environment(\.colorScheme, .dark)
     .onAppear { state.onAppear() }
     .alert("Error", isPresented: $state.showError) {
@@ -36,6 +38,20 @@ struct ContentView: View {
       DuplicateResolverSheet(state: state)
     }
     .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isDropTarget, perform: handleFileDrop(providers:))
+    #if os(iOS)
+    .fileImporter(
+      isPresented: $state.isFileImporterPresented,
+      allowedContentTypes: [.folder],
+      allowsMultipleSelection: false
+    ) { result in
+      switch result {
+      case .success(let urls):
+        state.indexSources(urls)
+      case .failure:
+        break
+      }
+    }
+    #endif
   }
 
   private var loadedScreen: some View {
@@ -115,7 +131,7 @@ struct ContentView: View {
   private var loadedContentMaxWidth: CGFloat {
     switch state.camerasDetected.count {
     case 0...4:
-      return 820
+      return 860
     case 5...6:
       return 1080
     default:
@@ -124,9 +140,9 @@ struct ContentView: View {
   }
 
   private func loadedPreviewMaxHeight(for totalHeight: CGFloat) -> CGFloat {
-    // Keep the export controls reachable in the default desktop window.
-    let reserved: CGFloat = state.camerasDetected.count <= 4 ? 580 : 620
-    return max(320, totalHeight - reserved)
+    // Keep the controls reachable without scrolling.
+    let reserved: CGFloat = state.camerasDetected.count <= 4 ? 420 : 460
+    return max(240, totalHeight - reserved)
   }
 }
 
@@ -303,12 +319,12 @@ private struct PreviewPanelCard: View {
 
         HStack(spacing: 8) {
           ForEach(state.camerasDetected, id: \.self) { camera in
-            Text(camera.displayName)
-              .font(.system(size: 11, weight: .semibold))
+            Text(camera.shortName)
+              .font(.system(size: 10, weight: .semibold))
               .foregroundColor(TeslaCamTheme.Colors.textSecondary)
           }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .topTrailing)
 
         if !playbackUI.telemetryText.isEmpty {
@@ -383,26 +399,14 @@ private struct TimelineExportCard: View {
   let timelineMarkers: [Date]
   let isSingleDayTimeline: Bool
 
-  private let quickRangeColumns = [
-    GridItem(.flexible(minimum: 120), spacing: 8),
-    GridItem(.flexible(minimum: 120), spacing: 8)
-  ]
-  private let cameraColumns = [
-    GridItem(.adaptive(minimum: 120), spacing: 8)
-  ]
-
   var body: some View {
     let minDate = state.minDate ?? Date()
     let maxDate = state.maxDate ?? Date()
 
-    VStack(alignment: .leading, spacing: 14) {
-      HStack(alignment: .center, spacing: 12) {
-        Text("Timeline")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundColor(TeslaCamTheme.Colors.textSecondary)
+    VStack(alignment: .leading, spacing: 12) {
 
-        Spacer(minLength: 12)
-
+      // ── Row 1: Playback bar ──────────────────────────────
+      HStack(spacing: 10) {
         Button {
           state.togglePlay()
         } label: {
@@ -423,12 +427,19 @@ private struct TimelineExportCard: View {
 
         Spacer()
 
-        Text(trimRangeSummary)
+        Text(formatHMS(state.selectedTrimDuration))
           .font(TeslaCamTheme.Typography.monoDetail)
           .foregroundColor(TeslaCamTheme.Colors.textTertiary)
-          .lineLimit(1)
+
+        Text("·")
+          .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+
+        Text("\(state.selectedSetsForExport.count) spans")
+          .font(TeslaCamTheme.Typography.monoDetail)
+          .foregroundColor(TeslaCamTheme.Colors.textTertiary)
       }
 
+      // ── Row 2: Timeline track ────────────────────────────
       TimelineSelectionTrack(
         currentSeconds: playbackSecondsBinding,
         selectedStartSeconds: $state.trimStartSeconds,
@@ -442,7 +453,7 @@ private struct TimelineExportCard: View {
         onDragChange: { start, end in state.updateTrimRange(startSeconds: start, endSeconds: end) },
         onDragEnd: { start, end in state.endTrimDrag(startSeconds: start, endSeconds: end) }
       )
-      .frame(height: 76)
+      .frame(height: 70)
 
       HStack(spacing: 18) {
         Text(tickLabel(for: state.minDate))
@@ -455,16 +466,8 @@ private struct TimelineExportCard: View {
       .font(TeslaCamTheme.Typography.monoDetail)
       .foregroundColor(TeslaCamTheme.Colors.textTertiary)
 
-      ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 8) {
-          ExportStatBadge(title: "Selected", value: formatHMS(state.selectedTrimDuration))
-          ExportStatBadge(title: "Spans", value: "\(state.selectedSetsForExport.count)")
-          ExportStatBadge(title: "Cameras", value: "\(state.activeExportCameras.count)/\(max(state.camerasDetected.count, 1))")
-          ExportStatBadge(title: "Preset", value: state.exportPreset.displayName)
-        }
-      }
-
-      HStack(alignment: .top, spacing: 12) {
+      // ── Row 3: Controls grid — From / Preset / To ────────
+      HStack(alignment: .top, spacing: 10) {
         RangeControlCard(title: "From") {
           DatePicker(
             "",
@@ -476,10 +479,14 @@ private struct TimelineExportCard: View {
             displayedComponents: [.date, .hourAndMinute]
           )
           .labelsHidden()
+          #if os(macOS)
           .datePickerStyle(.field)
+          #else
+          .datePickerStyle(.compact)
+          #endif
         }
 
-        RangeControlCard(title: "Export Preset") {
+        RangeControlCard(title: "Preset") {
           Picker("", selection: $state.exportPreset) {
             ForEach(ExportPreset.allCases) { preset in
               Text(preset.displayName).tag(preset)
@@ -500,35 +507,38 @@ private struct TimelineExportCard: View {
             displayedComponents: [.date, .hourAndMinute]
           )
           .labelsHidden()
+          #if os(macOS)
           .datePickerStyle(.field)
+          #else
+          .datePickerStyle(.compact)
+          #endif
         }
       }
-      .frame(minHeight: TeslaCamTheme.Metrics.controlHeight)
+      .frame(minHeight: 48)
 
-      HStack(alignment: .top, spacing: 12) {
-        VStack(alignment: .leading, spacing: 10) {
-          Text("Quick Range")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(TeslaCamTheme.Colors.textTertiary)
+      // ── Row 4: Camera toggles ────────────────────────────
+      CameraToggleRow(state: state)
 
-          LazyVGrid(columns: quickRangeColumns, alignment: .leading, spacing: 8) {
-            Button("Whole Timeline") { state.setFullRange() }
-              .buttonStyle(QuickActionButtonStyle())
-            Button("Current Minute") { state.setCurrentMinuteRange() }
-              .buttonStyle(QuickActionButtonStyle())
-            Button("Last 5m") { state.setRecentRange(minutes: 5) }
-              .buttonStyle(QuickActionButtonStyle())
-            Button("Last 15m") { state.setRecentRange(minutes: 15) }
-              .buttonStyle(QuickActionButtonStyle())
-          }
+      // ── Row 5: Quick range + Duplicate + Export ───────────
+      HStack(alignment: .top, spacing: 10) {
+        // Quick range row
+        HStack(spacing: 6) {
+          Button("All") { state.setFullRange() }
+            .buttonStyle(QuickActionButtonStyle())
+          Button("1m") { state.setCurrentMinuteRange() }
+            .buttonStyle(QuickActionButtonStyle())
+          Button("5m") { state.setRecentRange(minutes: 5) }
+            .buttonStyle(QuickActionButtonStyle())
+          Button("15m") { state.setRecentRange(minutes: 15) }
+            .buttonStyle(QuickActionButtonStyle())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(minHeight: TeslaCamTheme.Metrics.controlHeight, alignment: .topLeading)
-        .teslaCamCard(fill: TeslaCamTheme.Colors.surface, radius: TeslaCamTheme.Metrics.controlCorner)
 
-        RangeControlCard(title: "Duplicate Handling") {
+        // Duplicate handling
+        HStack(spacing: 6) {
+          Text("Dupes")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(TeslaCamTheme.Colors.textTertiary)
           Picker(
             "",
             selection: Binding(
@@ -542,39 +552,20 @@ private struct TimelineExportCard: View {
           }
           .labelsHidden()
           .pickerStyle(.menu)
+          .fixedSize()
         }
 
-        ExportActionCard(state: state)
+        // Export button
+        Button("Export Video") { state.exportRange() }
+          .buttonStyle(PrimaryButtonStyle())
+          .disabled(state.clipSets.isEmpty || state.exporter.isExporting)
+          .accessibilityLabel("Export Video")
+          .accessibilityIdentifier("export-video")
+          .frame(maxWidth: 180)
       }
+      .frame(minHeight: 42)
 
-      VStack(alignment: .leading, spacing: 10) {
-        HStack(alignment: .center, spacing: 8) {
-          Text("Cameras")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(TeslaCamTheme.Colors.textTertiary)
-
-          if state.camerasDetected.isEmpty {
-            Text("No cameras detected yet")
-              .font(.system(size: 11))
-              .foregroundColor(TeslaCamTheme.Colors.textSecondary)
-          }
-        }
-
-        LazyVGrid(columns: cameraColumns, alignment: .leading, spacing: 8) {
-          ForEach(state.camerasDetected, id: \.self) { camera in
-            ExportCameraChip(
-              title: camera.displayName,
-              enabled: state.activeExportCameras.contains(camera)
-            ) {
-              let isEnabled = state.activeExportCameras.contains(camera)
-              state.toggleExportCamera(camera, isEnabled: !isEnabled)
-            }
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
+      // ── Info banners (only if relevant) ──────────────────
       if !state.duplicateSummaryText.isEmpty {
         ExportInfoBanner(
           title: "Duplicates",
@@ -653,25 +644,44 @@ private struct TimelineExportCard: View {
   }
 }
 
-private struct ExportStatBadge: View {
-  let title: String
-  let value: String
+private struct CameraToggleRow: View {
+  @ObservedObject var state: AppState
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title.uppercased())
-        .font(.system(size: 9, weight: .semibold))
-        .foregroundColor(TeslaCamTheme.Colors.textTertiary)
-      Text(value)
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundColor(TeslaCamTheme.Colors.textPrimary)
-        .lineLimit(1)
+    HStack(spacing: 6) {
+      ForEach(state.camerasDetected, id: \.self) { camera in
+        Button {
+          let isEnabled = state.activeExportCameras.contains(camera)
+          state.toggleExportCamera(camera, isEnabled: !isEnabled)
+        } label: {
+          HStack(spacing: 5) {
+            Image(systemName: state.activeExportCameras.contains(camera) ? "checkmark.circle.fill" : "circle")
+              .font(.system(size: 11, weight: .semibold))
+            Text(camera.shortName)
+              .font(.system(size: 11, weight: .semibold))
+              .lineLimit(1)
+          }
+          .foregroundColor(state.activeExportCameras.contains(camera) ? TeslaCamTheme.Colors.textPrimary : TeslaCamTheme.Colors.textSecondary)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 8)
+          .frame(maxWidth: .infinity)
+          .background(
+            RoundedRectangle(cornerRadius: TeslaCamTheme.Metrics.compactCorner, style: .continuous)
+              .fill(state.activeExportCameras.contains(camera) ? TeslaCamTheme.Colors.surfaceElevated : TeslaCamTheme.Colors.surface)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: TeslaCamTheme.Metrics.compactCorner, style: .continuous)
+              .stroke(state.activeExportCameras.contains(camera) ? TeslaCamTheme.Colors.accent.opacity(0.5) : TeslaCamTheme.Colors.stroke, lineWidth: 1)
+          )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(camera.displayName)
+        .accessibilityValue(state.activeExportCameras.contains(camera) ? "Included" : "Excluded")
+      }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 10)
-    .teslaCamCard(fill: TeslaCamTheme.Colors.surface, radius: 12)
   }
 }
+
 
 private struct ExportActionCard: View {
   @ObservedObject var state: AppState
@@ -1091,42 +1101,33 @@ private struct TimelineSelectionTrack: View {
 
   private var handle: some View {
     ZStack {
-      Color.clear.frame(width: 28, height: 44)
-      RoundedRectangle(cornerRadius: 4, style: .continuous)
+      Color.clear.frame(width: 20, height: 44)
+      RoundedRectangle(cornerRadius: 3, style: .continuous)
         .fill(TeslaCamTheme.Colors.controlKnob)
-        .frame(width: 12, height: 30)
+        .frame(width: 6, height: 26)
         .overlay(
-          RoundedRectangle(cornerRadius: 4, style: .continuous)
-            .stroke(TeslaCamTheme.Colors.controlKnobStroke, lineWidth: 1)
+          RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .stroke(TeslaCamTheme.Colors.controlKnobStroke, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.16), radius: 2, x: 0, y: 1)
+        .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 1)
     }
   }
 
   private var playhead: some View {
     ZStack(alignment: .center) {
-      Color.clear.frame(width: 22, height: 46)
+      Color.clear.frame(width: 16, height: 44)
       Capsule(style: .continuous)
-        .fill(TeslaCamTheme.Colors.controlKnob.opacity(0.92))
-        .frame(width: 2, height: 32)
-      Circle()
         .fill(TeslaCamTheme.Colors.accent)
-        .frame(width: 10, height: 10)
-        .offset(y: 16)
-        .overlay(
-          Circle()
-            .stroke(Color.white.opacity(0.7), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+        .frame(width: 2, height: 34)
     }
   }
 
   private func clampedHandleX(centerX: CGFloat, trackInset: CGFloat, trackWidth: CGFloat) -> CGFloat {
-    max(trackInset, min(trackInset + trackWidth - 28, centerX - 14))
+    max(trackInset, min(trackInset + trackWidth - 20, centerX - 10))
   }
 
   private func clampedPlayheadX(centerX: CGFloat, trackInset: CGFloat, trackWidth: CGFloat) -> CGFloat {
-    max(trackInset, min(trackInset + trackWidth - 22, centerX - 11))
+    max(trackInset, min(trackInset + trackWidth - 16, centerX - 8))
   }
 
   private func seconds(forX x: CGFloat, originX: CGFloat, width: CGFloat) -> Double {

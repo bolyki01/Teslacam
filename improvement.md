@@ -1,4 +1,4 @@
-https://github.com/bolyki01/Teslacam
+https://github.com/magrathean-uk/Teslacam
 
 # Teslacam Improvement Plan
 
